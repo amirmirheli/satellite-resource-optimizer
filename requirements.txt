@@ -1,0 +1,9 @@
+# Dependency manifest for Streamlit Community Cloud ONLY.
+#
+# Streamlit Cloud installs with pip and does not read uv dependency-groups (where `streamlit`
+# lives), so this file installs the satsim package (which pulls its runtime deps from
+# pyproject.toml: pydantic, pydantic-settings, ortools) plus Streamlit itself.
+#
+# For local development use uv instead:  uv sync --group ui
+.
+streamlit>=1.36

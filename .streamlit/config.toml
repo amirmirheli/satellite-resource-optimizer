@@ -1,0 +1,9 @@
+# Streamlit app configuration (used locally and on Streamlit Community Cloud).
+
+[theme]
+base = "dark"
+primaryColor = "#4c8bf5"
+
+[server]
+# Cloud sets these itself; harmless locally and explicit for container runs.
+headless = true

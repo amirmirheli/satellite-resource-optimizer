@@ -1,0 +1,64 @@
+[project]
+name = "satellite-resource-optimizer"
+version = "0.1.0"
+description = "Simulation of a satellite resource-optimization control plane (hexagonal, fakes-only default path)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "pydantic>=2.7",
+    # Typed settings from environment / .env (official pydantic companion).
+    "pydantic-settings>=2.3",
+    # Tier-3 MILP optimizer (Apache-2.0). Default test/CI path uses the heuristic
+    # fallback, so the solver is never on the critical path for fast tests.
+    "ortools>=9.10",
+]
+
+[project.scripts]
+satsim = "satsim.cli:main"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pytest>=8.2",
+]
+# Optional interactive UI; install with `uv sync --group ui`. Not on the default/test path.
+ui = [
+    "streamlit>=1.36",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/satsim"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+target-version = "py311"
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, isort, pyupgrade, bugbear, simplify
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["satsim"]
+mypy_path = "src"
+plugins = ["pydantic.mypy"]
+
+# OR-Tools ships without complete type stubs; isolate the ignore to that import only.
+[[tool.mypy.overrides]]
+module = ["ortools.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "solver: tests that exercise the OR-Tools SolverOptimizer (excluded from the fast default path)",
+]

@@ -1,0 +1,9 @@
+# Convenience compose for the Streamlit UI:  docker compose up --build
+# Then open http://localhost:8501
+services:
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    ports:
+      - "8501:8501"
