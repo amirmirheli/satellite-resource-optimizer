@@ -220,7 +220,7 @@ class SchedulingResult:
     served: tuple[ServiceRequest, ...] = ()
     deferred: tuple[ServiceRequest, ...] = ()
     dropped: tuple[RejectedRequest, ...] = ()
-    fairness_index: float = 1.0  # e.g. Jain's index across served requests [0,1]
+    fairness_index: float = 1.0  # e.g. Jain's index across candidate opportunity [0,1]
     utilization: float = 0.0  # fraction of available capacity allocated [0,1]
 
 
@@ -248,9 +248,16 @@ class CongestionState:
 
     @property
     def collapse_risk(self) -> float:
-        """Coarse [0,1] indicator combining over-subscription and drop rate."""
+        """Coarse [0,1] indicator combining over-subscription, drops, and backlog."""
         over = max(0.0, self.utilization - 1.0)
-        return min(1.0, 0.5 * min(1.0, over) + 0.5 * self.drop_rate)
+        return min(1.0, 0.5 * min(1.0, over) + 0.5 * self.drop_rate + 0.5 * self.queue_pressure)
+
+    @property
+    def queue_pressure(self) -> float:
+        """Coarse [0,1] consumer-lag pressure from retry/source backlog."""
+        if self.queue_depth <= 0:
+            return 0.0
+        return min(1.0, self.queue_depth / max(1.0, self.available_capacity_units))
 
 
 @dataclass(frozen=True, slots=True)

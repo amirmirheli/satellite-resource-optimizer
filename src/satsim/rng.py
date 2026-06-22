@@ -7,6 +7,7 @@ sub-streams (e.g. one per component) from a single master seed.
 
 from __future__ import annotations
 
+import hashlib
 import random
 from collections.abc import Sequence
 from typing import TypeVar
@@ -27,7 +28,9 @@ class Rng:
 
     def derive(self, label: str) -> Rng:
         """Create an independent sub-stream keyed by ``label`` (stable across runs)."""
-        return Rng(hash((self._seed, label)) & 0xFFFF_FFFF)
+        payload = f"{self._seed}:{label}".encode()
+        digest = hashlib.blake2s(payload, digest_size=4, person=b"satsim").digest()
+        return Rng(int.from_bytes(digest, byteorder="big", signed=False))
 
     def random(self) -> float:
         """Uniform float in ``[0.0, 1.0)``."""

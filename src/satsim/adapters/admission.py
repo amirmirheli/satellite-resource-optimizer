@@ -40,8 +40,8 @@ class ProbabilisticAdmissionController:
         step: int,
     ) -> AdmissionResult:
         curve = self._plan.admission_curve
-        # Extra shedding pressure when over-subscribed (0 when utilization <= 1).
-        overage = min(1.0, max(0.0, congestion.utilization - 1.0))
+        # Extra shedding pressure when over-subscribed or when consumer lag is building.
+        overage = min(1.0, max(0.0, congestion.utilization - 1.0) + congestion.queue_pressure)
 
         admitted: list[ScoredRequest] = []
         rejected: list[RejectedRequest] = []

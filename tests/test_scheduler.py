@@ -136,6 +136,18 @@ def test_utilization_and_fairness_reported() -> None:
     assert result.fairness_index == 1.0  # equal allocations
 
 
+def test_fairness_counts_deferred_candidates_as_zero_service() -> None:
+    sched = HeuristicScheduler()
+    result = sched.schedule(
+        [_candidate("served", score=0.9, cost=5.0), _candidate("deferred", score=0.1, cost=5.0)],
+        _snapshot(5.0),
+        step=0,
+    )
+    assert [r.request_id for r in result.served] == ["served"]
+    assert [r.request_id for r in result.deferred] == ["deferred"]
+    assert result.fairness_index < 1.0
+
+
 def test_degradable_request_gets_reduced_allocation() -> None:
     # Beam has 4 units; a degradable request needing 10 is served degraded with the 4 available.
     sched = HeuristicScheduler()

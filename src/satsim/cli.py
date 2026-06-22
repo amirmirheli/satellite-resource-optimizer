@@ -5,9 +5,11 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 
+from pydantic import ValidationError
+
 from satsim import __version__
 from satsim.adapters.telemetry import ConsoleTelemetrySink, InMemoryTelemetrySink
-from satsim.config import SimulationConfig
+from satsim.config import OptimizerConfig, SimulationConfig
 from satsim.loop import RunSummary, build_simulation
 from satsim.scenarios import SCENARIOS, build_scenario, scenario_names
 from satsim.settings import RunSettings
@@ -23,8 +25,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=scenario_names(),
         help="Named scenario to run.",
     )
-    parser.add_argument("--seed", type=int, default=None, help="Override the scenario's RNG seed.")
-    parser.add_argument("--steps", type=int, default=None, help="Override simulation duration.")
+    parser.add_argument(
+        "--seed", type=_non_negative_int, default=None, help="Override the scenario's RNG seed."
+    )
+    parser.add_argument(
+        "--steps", type=_positive_int, default=None, help="Override simulation duration."
+    )
     parser.add_argument(
         "--verbose", action="store_true", help="Print per-step telemetry while running."
     )
@@ -33,22 +39,26 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code."""
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
 
     if args.scenario is None:
         _list_scenarios()
         return 0
 
     # Precedence: explicit CLI flag > env / .env > scenario default.
-    settings = RunSettings()
-    env_set = settings.overrides()
-    env_seed = settings.seed if "seed" in env_set else None
-    env_steps = settings.steps if "steps" in env_set else None
-    seed = args.seed if args.seed is not None else env_seed
-    steps = args.steps if args.steps is not None else env_steps
+    try:
+        settings = RunSettings()
+        env_set = settings.overrides()
+        env_seed = settings.seed if "seed" in env_set else None
+        env_steps = settings.steps if "steps" in env_set else None
+        seed = args.seed if args.seed is not None else env_seed
+        steps = args.steps if args.steps is not None else env_steps
 
-    config = build_scenario(args.scenario, seed=seed, steps=steps)
-    config = _apply_run_overrides(config, settings, env_set)
+        config = build_scenario(args.scenario, seed=seed, steps=steps)
+        config = _apply_run_overrides(config, settings, env_set)
+    except ValidationError as exc:
+        parser.error(str(exc))
     verbose = args.verbose or ("verbose" in env_set and settings.verbose)
 
     print(
@@ -84,9 +94,29 @@ def _apply_run_overrides(
     if "solver_time_limit_s" in env_set:
         opt_updates["solver_time_limit_s"] = settings.solver_time_limit_s
     if opt_updates:
-        updates["optimizer"] = config.optimizer.model_copy(update=opt_updates)
+        opt_data = config.optimizer.model_dump()
+        opt_data.update(opt_updates)
+        updates["optimizer"] = OptimizerConfig.model_validate(opt_data)
 
-    return config.model_copy(update=updates) if updates else config
+    if not updates:
+        return config
+    data = config.model_dump()
+    data.update(updates)
+    return SimulationConfig.model_validate(data)
+
+
+def _positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be greater than 0")
+    return parsed
+
+
+def _non_negative_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be greater than or equal to 0")
+    return parsed
 
 
 def _list_scenarios() -> None:

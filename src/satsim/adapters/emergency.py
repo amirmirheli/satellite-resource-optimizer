@@ -88,7 +88,10 @@ class EmergencyLane:
                 request.size_bytes, request.link_quality,
                 self._scoring.bytes_per_unit, self._scoring.min_link_quality,
             )
-            need = min(self._config.max_units_per_request, cost)
+            if cost > self._config.max_units_per_request + 1e-9:
+                shed.append(RejectedRequest(request, RejectReason.EMERGENCY_LANE_FULL))
+                continue
+            need = cost
             if region_used.get(request.region, 0.0) + need > per_region_cap + 1e-9:
                 shed.append(RejectedRequest(request, RejectReason.EMERGENCY_LANE_FULL))
                 continue

@@ -58,9 +58,10 @@ class StepCounters:
     served_by_fleet: Mapping[FleetId, int] = field(default_factory=dict)
     rejected_by_reason: Mapping[RejectReason, int] = field(default_factory=dict)
 
-    fairness_index: float = 1.0  # Jain's index across served requests [0,1]
+    fairness_index: float = 1.0  # Jain's index across candidate opportunity [0,1]
     utilization: float = 0.0  # fraction of capacity allocated [0,1]
     collapse_risk: float = 0.0  # congestion-collapse indicator [0,1]
+    queue_depth: int = 0  # retry/source backlog visible to control and telemetry
 
     degrade_mode: DegradeMode = DegradeMode.NORMAL
     fallback_activations: int = 0

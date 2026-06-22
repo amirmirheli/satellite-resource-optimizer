@@ -48,13 +48,14 @@ class _BeamState:
 
 
 def _jain_index(values: Sequence[float]) -> float:
-    """Jain's fairness index over ``values`` (1.0 = perfectly fair, ~1/n = maximally unfair)."""
-    positives = [v for v in values if v > 0.0]
-    if not positives:
+    """Jain's fairness index over ``values`` including zero-service candidates."""
+    if not values:
         return 1.0
-    total = sum(positives)
-    sum_sq = sum(v * v for v in positives)
-    return (total * total) / (len(positives) * sum_sq)
+    total = sum(values)
+    if total <= 0.0:
+        return 0.0
+    sum_sq = sum(v * v for v in values)
+    return (total * total) / (len(values) * sum_sq)
 
 
 class _GreedyScheduler:
@@ -102,7 +103,10 @@ class _GreedyScheduler:
 
         allocated_total = sum(a.allocated_units for a in allocations)
         utilization = allocated_total / total_capacity if total_capacity > 0.0 else 0.0
-        fairness = _jain_index([a.allocated_units for a in allocations])
+        allocated_by_request = {a.request_id: a.allocated_units for a in allocations}
+        fairness = _jain_index(
+            [allocated_by_request.get(c.request.request_id, 0.0) for c in candidates]
+        )
 
         return SchedulingResult(
             allocations=tuple(allocations),

@@ -311,11 +311,18 @@ class ControlLoop:
         offered = sum(s.scoring.estimated_cost_units for s in best_effort)
         return CongestionState(
             step=step,
-            queue_depth=len(self._retry_queue),
+            queue_depth=len(self._retry_queue) + self._source_backlog(),
             offered_load_units=offered,
             available_capacity_units=remaining.total_capacity(),
             drop_rate=self._last_drop_rate,
         )
+
+    def _source_backlog(self) -> int:
+        """Best-effort read of source-side consumer lag for adapters that expose it."""
+        value = getattr(self._source, "backlog", 0)
+        if isinstance(value, int):
+            return max(0, value)
+        return 0
 
     def _build_candidates(
         self, admitted: Sequence[ScoredRequest]
@@ -460,6 +467,7 @@ class ControlLoop:
             fairness_index=fairness_index,
             utilization=min(1.0, utilization),
             collapse_risk=congestion.collapse_risk,
+            queue_depth=congestion.queue_depth,
             degrade_mode=degrade_mode,
             fallback_activations=fallback_activations,
             circuit_breaker_trips=circuit_breaker_trips,

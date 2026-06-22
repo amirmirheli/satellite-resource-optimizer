@@ -42,11 +42,12 @@ def disposition_series(steps: list[StepCounters]) -> dict[str, list[int]]:
 
 
 def health_series(steps: list[StepCounters]) -> dict[str, list[float]]:
-    """Per-step utilization / collapse-risk / fairness (for a line chart)."""
+    """Per-step utilization / collapse-risk / fairness / queue depth (for a line chart)."""
     return {
         "utilization": [s.utilization for s in steps],
         "collapse_risk": [s.collapse_risk for s in steps],
         "fairness_index": [s.fairness_index for s in steps],
+        "queue_depth": [float(s.queue_depth) for s in steps],
     }
 
 

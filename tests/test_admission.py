@@ -60,6 +60,16 @@ def test_congestion_damps_low_scores_but_spares_high() -> None:
     assert admitted_ids == {"high"}
 
 
+def test_queue_pressure_damps_low_scores_even_when_polled_load_is_low() -> None:
+    ac = ProbabilisticAdmissionController(Rng(0), _plan(AdmissionCurve.constant(1.0)))
+    lagging = CongestionState(
+        step=0, queue_depth=100, offered_load_units=50.0, available_capacity_units=100.0
+    )
+    result = ac.admit([_scored(0.0, rid="low"), _scored(1.0, rid="high")], lagging, step=0)
+    admitted_ids = {s.request.request_id for s in result.admitted}
+    assert admitted_ids == {"high"}
+
+
 def test_update_policy_changes_behavior() -> None:
     ac = ProbabilisticAdmissionController(Rng(0), _plan(AdmissionCurve.constant(0.0)))
     assert ac.admit([_scored(0.9)], _calm(), step=0).admitted == ()

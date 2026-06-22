@@ -10,6 +10,7 @@ Env vars are prefixed ``SATSIM_`` (e.g. ``SATSIM_SEED=7``, ``SATSIM_SCHEDULER=he
 
 from __future__ import annotations
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from satsim.domain.enums import OptimizerBackend, SchedulerKind
@@ -25,11 +26,11 @@ class RunSettings(BaseSettings):
         extra="ignore",
     )
 
-    seed: int = 0
-    steps: int | None = None
+    seed: int = Field(default=0, ge=0)
+    steps: int | None = Field(default=None, gt=0)
     scheduler: SchedulerKind = SchedulerKind.PRIORITY_FAIR
     optimizer_backend: OptimizerBackend = OptimizerBackend.HEURISTIC
-    solver_time_limit_s: float = 0.5
+    solver_time_limit_s: float = Field(default=0.5, gt=0.0)
     verbose: bool = False
 
     def overrides(self) -> set[str]:
