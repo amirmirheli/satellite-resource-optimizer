@@ -126,9 +126,14 @@ def build_scenario(
     if name not in SCENARIOS:
         raise KeyError(f"unknown scenario: {name!r}")
     config = SCENARIOS[name].build()
-    overrides: dict[str, int] = {}
+    overrides: dict[str, object] = {}
     if seed is not None:
         overrides["seed"] = seed
     if steps is not None:
         overrides["duration_steps"] = steps
-    return config.model_copy(update=overrides) if overrides else config
+        overrides["surges"] = tuple(surge for surge in config.surges if surge.at_step < steps)
+    if not overrides:
+        return config
+    data = config.model_dump()
+    data.update(overrides)
+    return SimulationConfig.model_validate(data)

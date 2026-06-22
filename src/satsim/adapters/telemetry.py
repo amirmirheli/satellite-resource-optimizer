@@ -68,6 +68,7 @@ class ConsoleTelemetrySink:
             f"admitted={counters.admitted} served={counters.served} "
             f"deferred={counters.deferred} dropped={counters.dropped} "
             f"rejected={counters.rejected} "
+            f"queue={counters.queue_depth} "
             f"util={counters.utilization:.2f} fairness={counters.fairness_index:.2f} "
             f"collapse_risk={counters.collapse_risk:.2f} mode={counters.degrade_mode.value}"
         )

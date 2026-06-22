@@ -89,15 +89,15 @@ def test_higher_urgency_served_first() -> None:
     assert [r.request_id for r in decision.admitted] == ["high"]
 
 
-def test_per_request_cap_bounds_allocation() -> None:
-    # A poor-link request would cost a lot; the cap bounds what it can reserve.
+def test_per_request_cap_sheds_oversized_request() -> None:
+    # A request that exceeds the emergency lane's per-request cap is not counted served.
     lane = _lane(reserved_fraction=1.0, max_units_per_request=4.0)
     snap = _snapshot((Region.NA, 100.0))
     poor = _sos("poor", size=256, link=0.05)  # raw cost = (256/4096)/0.05 = 1.25 -> under cap
-    big = _sos("big", size=100 * 4096, link=1.0)  # raw cost 100 -> capped to 4
+    big = _sos("big", size=100 * 4096, link=1.0)  # raw cost 100 -> over cap
     decision = lane.reserve([big, poor], snap, _plan(), step=0)
-    big_alloc = next(a for a in decision.reservations if a.request_id == "big")
-    assert big_alloc.allocated_units == 4.0  # capped
+    assert [a.request_id for a in decision.reservations] == ["poor"]
+    assert any(r.request.request_id == "big" for r in decision.shed)
 
 
 def test_geographic_fairness_caps_one_region() -> None:

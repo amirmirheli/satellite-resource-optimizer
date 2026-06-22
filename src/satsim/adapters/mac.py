@@ -43,11 +43,12 @@ class _BeamGrid:
 
 
 def _jain_index(values: Sequence[float]) -> float:
-    positives = [v for v in values if v > 0.0]
-    if not positives:
+    if not values:
         return 1.0
-    total = sum(positives)
-    return (total * total) / (len(positives) * sum(v * v for v in positives))
+    total = sum(values)
+    if total <= 0.0:
+        return 0.0
+    return (total * total) / (len(values) * sum(v * v for v in values))
 
 
 class SlotMacScheduler:
@@ -95,12 +96,17 @@ class SlotMacScheduler:
 
         allocated_units = sum(a.allocated_units for a in allocations)
         utilization = allocated_units / total_capacity if total_capacity > 0.0 else 0.0
+        allocated_by_request = {a.request_id: a.allocated_units for a in allocations}
+        fairness = _jain_index(
+            [allocated_by_request.get(c.request.request_id, 0.0) for c in candidates]
+        )
+
         return SchedulingResult(
             allocations=tuple(allocations),
             served=tuple(served),
             deferred=tuple(deferred),
             dropped=tuple(dropped),
-            fairness_index=_jain_index([a.allocated_units for a in allocations]),
+            fairness_index=fairness,
             utilization=min(1.0, utilization),
         )
 
@@ -108,16 +114,20 @@ class SlotMacScheduler:
         request = candidate.request
         needed = self._rbs_needed(request)
         cap = self._config.max_rbs_per_request or needed  # per-request RB cap (MAC fairness)
-        legal = {(opt.fleet, opt.band) for opt in candidate.options}
+        option_caps = {
+            (opt.fleet, opt.band): opt.constraints.max_airtime_units for opt in candidate.options
+        }
 
         # Pick the eligible beam offering the most assignable RBs.
         best: _BeamGrid | None = None
         best_assignable = 0
         for grid in grids:
             beam = grid.beam
-            if beam.region != request.region or (beam.fleet, beam.band) not in legal:
+            option_cap = option_caps.get((beam.fleet, beam.band))
+            if beam.region != request.region or (beam.fleet, beam.band) not in option_caps:
                 continue
-            assignable = min(grid.free_rbs, cap)
+            reg_cap_rbs = self._regulatory_cap_rbs(option_cap, grid.rb_units, grid.free_rbs)
+            assignable = min(grid.free_rbs, cap, reg_cap_rbs)
             if assignable > best_assignable:
                 best = grid
                 best_assignable = assignable
@@ -169,3 +179,13 @@ class SlotMacScheduler:
             if link_quality >= level.min_link_quality:
                 efficiency = level.bits_per_symbol
         return efficiency
+
+    @staticmethod
+    def _regulatory_cap_rbs(
+        max_airtime_units: float | None, rb_units: float, free_rbs: int
+    ) -> int:
+        if rb_units <= 0.0:
+            return 0
+        if max_airtime_units is None:
+            return free_rbs
+        return max(0, math.floor(max_airtime_units / rb_units))

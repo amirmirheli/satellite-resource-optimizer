@@ -10,6 +10,7 @@ from satsim.domain.models import (
     Beam,
     CandidateOption,
     ConstellationSnapshot,
+    RegulatoryConstraints,
     RequestScore,
     Satellite,
     ScheduleCandidate,
@@ -101,6 +102,35 @@ def test_per_request_rb_cap_limits_allocation() -> None:
         [_candidate("p", score=0.5, size=1000, link=0.3)], snap, step=0
     )
     assert result.deferred and not result.served
+
+
+def test_regulatory_airtime_cap_limits_rb_allocation() -> None:
+    sched = SlotMacScheduler(MacConfig(slots_per_step=10, subchannels=10))
+    snap = _snapshot(100.0)  # 100 RBs, rb_units = 1.0
+    request = ServiceRequest(
+        request_id="capped",
+        traffic_class=TrafficClass.MAPS_TILES,
+        region=_REGION,
+        size_bytes=10_240,  # 20 RBs at QPSK, but regulatory cap allows only 5 units.
+        link_quality=0.3,
+        urgency=0.0,
+        arrival_step=0,
+        deadline_step=10,
+    )
+    candidate = ScheduleCandidate(
+        request=request,
+        options=(
+            CandidateOption(
+                fleet=_FLEET,
+                band=_BAND,
+                constraints=RegulatoryConstraints(max_airtime_units=5.0),
+            ),
+        ),
+        scoring=RequestScore(score=0.5, estimated_cost_units=20.0, delivery_probability=0.3),
+        degradable=True,
+    )
+    result = sched.schedule([candidate], snap, step=0)
+    assert result.allocations[0].allocated_units == 5.0
 
 
 def test_expired_dropped() -> None:

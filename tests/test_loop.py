@@ -124,6 +124,17 @@ def test_overload_triggers_rejections() -> None:
     assert shed
 
 
+def test_source_backlog_contributes_to_congestion_signal() -> None:
+    config = SimulationConfig(
+        seed=42,
+        duration_steps=3,
+        arrival=ArrivalConfig(baseline_rate=100.0, max_batch_per_step=1),
+    )
+    sink, _summary = _run(config)
+    assert sink.steps[-1].queue_depth > 0
+    assert any(step.collapse_risk > 0.0 for step in sink.steps)
+
+
 def test_emergency_reserved_capacity_only_for_urgent() -> None:
     # With a high emergency reserve, SOS surge consumes reserved capacity; verify SOS served.
     config = SimulationConfig(

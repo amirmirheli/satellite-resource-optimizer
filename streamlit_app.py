@@ -106,14 +106,21 @@ def _build_config() -> SimulationConfig:
             "link_quality_min": link_min,
         }
     )
+    emergency_data = base.emergency.model_dump()
+    emergency_data["reserved_fraction"] = reserved
+    overload_data = base.overload.model_dump()
+    overload_data["queue_capacity"] = int(queue_cap)
+    optimizer_data = base.optimizer.model_dump()
+    optimizer_data["backend"] = backend
+
     updates: dict[str, object] = {
         "seed": int(seed),
         "duration_steps": int(steps),
         "scheduler": scheduler,
         "arrival": arrival,
-        "emergency": base.emergency.model_copy(update={"reserved_fraction": reserved}),
-        "overload": base.overload.model_copy(update={"queue_capacity": int(queue_cap)}),
-        "optimizer": base.optimizer.model_copy(update={"backend": backend}),
+        "emergency": type(base.emergency).model_validate(emergency_data),
+        "overload": type(base.overload).model_validate(overload_data),
+        "optimizer": type(base.optimizer).model_validate(optimizer_data),
     }
     if surge_on:
         updates["surges"] = (
@@ -122,7 +129,9 @@ def _build_config() -> SimulationConfig:
         )
     else:
         updates["surges"] = ()
-    return base.model_copy(update=updates)
+    data = base.model_dump()
+    data.update(updates)
+    return SimulationConfig.model_validate(data)
 
 
 def main() -> None:
