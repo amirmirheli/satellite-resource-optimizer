@@ -4,9 +4,21 @@ from __future__ import annotations
 
 import pytest
 
-from satsim.adapters.optimizer import HeuristicOptimizer, SolverOptimizer, build_optimizer
+from satsim.adapters.optimizer import (
+    AdaptiveOptimizer,
+    HeuristicOptimizer,
+    SolverOptimizer,
+    build_optimizer,
+)
 from satsim.config import OptimizerConfig, SimulationConfig
-from satsim.domain.enums import Band, FleetId, OptimizerBackend, Region, TrafficClass
+from satsim.domain.enums import (
+    Band,
+    FleetId,
+    OptimizerBackend,
+    Region,
+    RejectReason,
+    TrafficClass,
+)
 from satsim.domain.models import (
     Beam,
     CongestionState,
@@ -130,6 +142,86 @@ def test_factory_selects_backend() -> None:
     assert isinstance(build_optimizer(heuristic_cfg), HeuristicOptimizer)
     solver_cfg = SimulationConfig(optimizer=OptimizerConfig(backend=OptimizerBackend.SOLVER))
     assert isinstance(build_optimizer(solver_cfg), SolverOptimizer)
+    adaptive_cfg = SimulationConfig(optimizer=OptimizerConfig(backend=OptimizerBackend.ADAPTIVE))
+    assert isinstance(build_optimizer(adaptive_cfg), AdaptiveOptimizer)
+
+
+# --------------------------------------------------------------------------- adaptive
+
+
+def _counters(
+    *, utilization: float, collapse_risk: float = 0.0, served: int = 0, shed: int = 0
+) -> StepCounters:
+    return StepCounters(
+        step=0,
+        served=served,
+        rejected=shed,
+        utilization=utilization,
+        collapse_risk=collapse_risk,
+        rejected_by_reason={RejectReason.ADMISSION_SHED: shed} if shed else {},
+    )
+
+
+def _adaptive_window(counters: tuple[StepCounters, ...]) -> PlanningWindow:
+    return PlanningWindow(step=10, snapshot=_snapshot(), recent_counters=counters)
+
+
+def test_adaptive_satisfies_port() -> None:
+    assert isinstance(AdaptiveOptimizer(), Optimizer)
+
+
+def test_adaptive_bootstraps_admit_all() -> None:
+    # No realized feedback yet -> the learned curve admits everything.
+    plan = AdaptiveOptimizer(valid_for_steps=5).plan(
+        PlanningWindow(step=0, snapshot=_snapshot())
+    )
+    assert plan.valid_for_steps == 5
+    assert plan.admission_curve.admit_probability(0.0) == 1.0
+
+
+def test_adaptive_tightens_low_scores_under_collapse() -> None:
+    opt = AdaptiveOptimizer(valid_for_steps=1, learning_rate=1.0, signal_smoothing=1.0)
+    # Beams full and offered load way over capacity -> shed low scores, never high.
+    curve = opt.plan(
+        _adaptive_window((_counters(utilization=1.0, collapse_risk=1.0, served=10, shed=5),))
+    ).admission_curve
+    assert curve.admit_probability(0.0) < curve.admit_probability(1.0)
+    assert curve.admit_probability(1.0) == 1.0
+
+
+def test_adaptive_recovers_when_shedding_with_idle_capacity() -> None:
+    opt = AdaptiveOptimizer(valid_for_steps=1, learning_rate=0.5, signal_smoothing=1.0)
+    # First, congestion collapse drives the low-score floor down.
+    tightened = opt.plan(
+        _adaptive_window((_counters(utilization=1.0, collapse_risk=1.0, served=10, shed=5),))
+    ).admission_curve.admit_probability(0.0)
+    # Then we shed heavily while beams sit idle -> the floor must climb back up.
+    recovered = opt.plan(
+        _adaptive_window((_counters(utilization=0.2, collapse_risk=0.0, served=2, shed=8),))
+    ).admission_curve.admit_probability(0.0)
+    assert recovered > tightened
+
+
+def test_adaptive_curve_is_monotone_in_score() -> None:
+    opt = AdaptiveOptimizer(valid_for_steps=1, learning_rate=1.0, signal_smoothing=1.0)
+    curve = opt.plan(
+        _adaptive_window((_counters(utilization=1.0, collapse_risk=0.8, served=10, shed=6),))
+    ).admission_curve
+    probs = [curve.admit_probability(s / 10.0) for s in range(11)]
+    assert probs == sorted(probs)  # non-decreasing: higher score never less likely
+
+
+def test_adaptive_idle_without_shedding_does_not_loosen() -> None:
+    # Idle capacity but nothing was shed (e.g. a demand lull) -> no false "too strict" signal,
+    # so an already-tightened floor is not spuriously raised.
+    opt = AdaptiveOptimizer(valid_for_steps=1, learning_rate=0.5, signal_smoothing=1.0)
+    tightened = opt.plan(
+        _adaptive_window((_counters(utilization=1.0, collapse_risk=1.0, served=10, shed=5),))
+    ).admission_curve.admit_probability(0.0)
+    unchanged = opt.plan(
+        _adaptive_window((_counters(utilization=0.1, collapse_risk=0.0, served=2, shed=0),))
+    ).admission_curve.admit_probability(0.0)
+    assert unchanged == pytest.approx(tightened)
 
 
 # --------------------------------------------------------------------------- solver

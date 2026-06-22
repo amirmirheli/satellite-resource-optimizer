@@ -17,10 +17,11 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Any
 
 from satsim.config import SimulationConfig
-from satsim.domain.enums import FleetId, OptimizerBackend, Region, TrafficClass
+from satsim.domain.enums import FleetId, OptimizerBackend, Region, RejectReason, TrafficClass
 from satsim.domain.models import ConstellationSnapshot
 from satsim.domain.planning import AdmissionCurve, PlanningWindow, ResourcePlan
 from satsim.ports.optimizer import Optimizer
@@ -353,6 +354,107 @@ def _region_pressure_share(
     return {r: per_region[r] / total for r in regions}
 
 
+# --------------------------------------------------------------------------- adaptive
+
+
+class AdaptiveOptimizer:
+    """Online, per-score-bucket admission curve that *learns* from realized utilization.
+
+    The heuristic and solver curves recompute a fixed formula of *offered*-load utilization
+    each cadence and keep no memory between runs. This optimizer instead holds the admit
+    probability of each score bucket as persistent state and nudges it from the *realized*
+    outcome of the curve it last broadcast:
+
+    * if recent steps shed best-effort traffic (``ADMISSION_SHED``) **while beams sat idle**,
+      the low-score buckets were too strict — raise them (the exact "rejecting with capacity to
+      spare" failure the offered-load curve cannot see);
+    * if recent steps showed congestion collapse, lower them.
+
+    Updates are graded by score (low-score buckets move most; the top of the curve stays pinned
+    admit-all, so high-value traffic is never shed) and the feedback signals are EWMA-smoothed to
+    damp per-window noise. Fairness weights, airtime budgets, and fleet hints are taken verbatim
+    from the heuristic planner — only the admission curve is learned.
+    """
+
+    def __init__(
+        self,
+        valid_for_steps: int = 1,
+        *,
+        buckets: int = 8,
+        learning_rate: float = 0.3,
+        signal_smoothing: float = 0.5,
+        floor_min: float = 0.05,
+        collapse_penalty: float = 1.0,
+        util_clamp: float = 10.0,
+        fairness_min: float = 0.5,
+        fairness_max: float = 1.5,
+    ) -> None:
+        if buckets < 1:
+            raise ValueError("buckets must be >= 1")
+        self._valid_for_steps = valid_for_steps
+        self._lr = learning_rate
+        self._beta = signal_smoothing
+        self._floor_min = floor_min
+        self._collapse_penalty = collapse_penalty
+        # Bucket score midpoints in (0, 1) and their learning gain (lower score -> larger gain).
+        self._mids = tuple((i + 0.5) / buckets for i in range(buckets))
+        self._grades = tuple(1.0 - m for m in self._mids)
+        # Persistent learned state: start permissive (admit all), tighten only on evidence.
+        self._p = [1.0] * buckets
+        # EWMA-smoothed feedback signals (None until the first window that carries counters).
+        self._u_ewma: float | None = None
+        self._collapse_ewma: float | None = None
+        self._shed_ewma: float | None = None
+        self._base = HeuristicOptimizer(
+            valid_for_steps,
+            util_clamp=util_clamp,
+            fairness_min=fairness_min,
+            fairness_max=fairness_max,
+        )
+
+    def plan(self, window: PlanningWindow) -> ResourcePlan:
+        self._learn(window)
+        # Reuse the heuristic's fairness/budgets/hints; swap in the learned admission curve.
+        return replace(self._base.plan(window), admission_curve=self._curve())
+
+    def _learn(self, window: PlanningWindow) -> None:
+        # Only the steps the previously broadcast curve actually governed are feedback.
+        recent = window.recent_counters[-self._valid_for_steps :]
+        if not recent:
+            return  # no realized outcome yet; keep the current (initially admit-all) curve
+
+        u_real = sum(c.utilization for c in recent) / len(recent)
+        collapse = sum(c.collapse_risk for c in recent) / len(recent)
+        handled = 0
+        shed = 0
+        for c in recent:
+            handled += c.served + c.deferred + c.dropped + c.rejected
+            shed += c.rejected_by_reason.get(RejectReason.ADMISSION_SHED, 0)
+        shed_frac = shed / handled if handled > 0 else 0.0
+
+        # EWMA-smooth the noisy per-window signals before acting on them.
+        self._u_ewma = self._ewma(self._u_ewma, u_real)
+        self._collapse_ewma = self._ewma(self._collapse_ewma, collapse)
+        self._shed_ewma = self._ewma(self._shed_ewma, shed_frac)
+
+        idle = max(0.0, 1.0 - self._u_ewma)
+        # Net signed signal: loosen when we shed *while* capacity sat idle; tighten on collapse.
+        signal = idle * self._shed_ewma - self._collapse_penalty * self._collapse_ewma
+        for i, grade in enumerate(self._grades):
+            self._p[i] = _clamp(self._p[i] + self._lr * grade * signal, self._floor_min, 1.0)
+        # Keep the curve monotone non-decreasing in score (higher score never less likely).
+        for i in range(1, len(self._p)):
+            self._p[i] = max(self._p[i], self._p[i - 1])
+
+    def _ewma(self, prev: float | None, value: float) -> float:
+        return value if prev is None else (1.0 - self._beta) * prev + self._beta * value
+
+    def _curve(self) -> AdmissionCurve:
+        # Endpoints anchor the curve: the score-0 floor and an always-admit (1.0, 1.0) ceiling.
+        points = [(0.0, self._p[0]), *zip(self._mids, self._p, strict=True), (1.0, 1.0)]
+        return AdmissionCurve(breakpoints=tuple(points))
+
+
 # --------------------------------------------------------------------------- factory
 
 
@@ -374,6 +476,16 @@ def build_optimizer(config: SimulationConfig) -> Optimizer:
             switching_penalty_weight=opt.switching_penalty_weight,
             congestion_penalty_weight=opt.congestion_penalty_weight,
             soft_utilization=opt.soft_utilization,
+            **tuning,
+        )
+    if opt.backend is OptimizerBackend.ADAPTIVE:
+        return AdaptiveOptimizer(
+            valid_for_steps=opt.cadence_steps,
+            buckets=opt.adaptive_buckets,
+            learning_rate=opt.adaptive_learning_rate,
+            signal_smoothing=opt.adaptive_signal_smoothing,
+            floor_min=opt.adaptive_floor_min,
+            collapse_penalty=opt.adaptive_collapse_penalty,
             **tuning,
         )
     return HeuristicOptimizer(valid_for_steps=opt.cadence_steps, **tuning)

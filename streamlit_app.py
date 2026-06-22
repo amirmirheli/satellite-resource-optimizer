@@ -8,11 +8,15 @@ and chart the results. All the real logic lives in the (UI-free, tested) library
 
 from __future__ import annotations
 
+import logging
+import time
+
 import streamlit as st
 
 from satsim.config import SimulationConfig, SurgeEvent
 from satsim.domain.enums import OptimizerBackend, SchedulerKind, TrafficClass
 from satsim.experiment import (
+    ExperimentResult,
     disposition_series,
     health_series,
     rejection_reason_totals,
@@ -21,7 +25,35 @@ from satsim.experiment import (
 )
 from satsim.scenarios import SCENARIOS, build_scenario, scenario_names
 
+# Logs go to the terminal hosting `streamlit run` (charts go to the browser). One line per run
+# so the re-execution model is visible from the shell.
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("satsim.streamlit")
+logger.setLevel(logging.INFO)
+
 _CUSTOM = "(custom defaults)"
+
+
+def _run_simulation(config: SimulationConfig) -> ExperimentResult:
+    """Run one simulation, logging its parameters and outcome to the terminal."""
+    logger.info(
+        "run start: seed=%d steps=%d scheduler=%s optimizer=%s baseline=%.1f surges=%d",
+        config.seed,
+        config.duration_steps,
+        config.scheduler.value,
+        config.optimizer.backend.value,
+        config.arrival.baseline_rate,
+        len(config.surges),
+    )
+    start = time.perf_counter()
+    result = run_experiment(config)
+    elapsed = time.perf_counter() - start
+    s = result.summary
+    logger.info(
+        "run done in %.3fs: served=%d deferred=%d dropped=%d rejected=%d backlog=%d",
+        elapsed, s.served, s.deferred, s.dropped, s.rejected, s.retry_backlog,
+    )
+    return result
 
 
 def _build_config() -> SimulationConfig:
@@ -98,11 +130,26 @@ def main() -> None:
     st.title("🛰️ Satellite Resource Optimization Simulator")
     st.caption(
         "Three-tier control plane: deterministic loop · reactive emergency lane · "
-        "periodic global optimizer. Tweak parameters in the sidebar and re-run."
+        "periodic global optimizer. Adjust parameters in the sidebar, then click Run."
     )
 
     config = _build_config()
-    result = run_experiment(config)
+
+    # Gate the (re-)run behind an explicit button: tweak several parameters, then run once.
+    st.sidebar.header("Run control")
+    if st.sidebar.button("▶ Run simulation", type="primary", use_container_width=True):
+        st.session_state["result"] = _run_simulation(config)
+        st.session_state["config"] = config
+
+    if "result" not in st.session_state:
+        st.info("👈 Set parameters in the sidebar, then click **▶ Run simulation**.")
+        return
+
+    # Render the last run; warn if the sidebar has drifted from what was actually run.
+    if config != st.session_state["config"]:
+        st.warning("Parameters changed since the last run — click **▶ Run simulation** to refresh.")
+    config = st.session_state["config"]
+    result = st.session_state["result"]
     summary, steps = result.summary, result.steps
 
     resolved = summary.served + summary.dropped + summary.rejected

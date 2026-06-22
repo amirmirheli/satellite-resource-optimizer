@@ -86,6 +86,7 @@ class OptimizerBackend(Enum):
 
     SOLVER = "solver"  # OR-Tools MILP (primary)
     HEURISTIC = "heuristic"  # deterministic fallback / fast-test default
+    ADAPTIVE = "adaptive"  # learns the admission curve online from realized utilization
 
 
 class SchedulerKind(Enum):

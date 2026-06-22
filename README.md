@@ -78,6 +78,12 @@ track real time windows instead of simulated ones — no core changes required.
   continuous per-(region, class) budgets bounded by the *assigned* fleet's capacity — maximizing
   priority-weighted served airtime with fairness, congestion, and fleet-switching terms.
   Deterministic heuristic fallback on timeout. (See [`NOTES.md`](NOTES.md) for the full model.)
+  A third backend, `AdaptiveOptimizer`, *learns* the admission curve online instead of
+  recomputing it: it keeps a per-score-bucket admit probability as state and nudges it from the
+  **realized** outcome of the curve it last broadcast — raising buckets that shed traffic while
+  beams sat idle (the "rejecting with capacity to spare" case the offered-load formula can't see)
+  and lowering them under congestion collapse, with the top of the curve pinned admit-all so
+  high-value traffic is never shed. Select via `SATSIM_OPTIMIZER_BACKEND=adaptive`.
 
 ### Ports (the dependency boundary)
 
@@ -91,7 +97,7 @@ Each is a `typing.Protocol` with a license-free fake adapter (a real adapter cou
 | `AdmissionController` | `ProbabilisticAdmissionController` | Tier-1 load shedding |
 | `EmergencyAdmission` | `EmergencyLane` | Tier-2 reserved-capacity lane |
 | `ResourceScheduler` | `HeuristicScheduler` / `PriorityFairScheduler` / `SlotMacScheduler` | beam allocation + degradation (fluid or MAC RB-grid) |
-| `Optimizer` | `SolverOptimizer` / `HeuristicOptimizer` | Tier-3 global planning |
+| `Optimizer` | `SolverOptimizer` / `HeuristicOptimizer` / `AdaptiveOptimizer` | Tier-3 global planning |
 | `TelemetrySink` | `ConsoleTelemetrySink` / `InMemoryTelemetrySink` | structured observability |
 
 ## Requirements
@@ -171,7 +177,7 @@ Two layers, by design:
   SATSIM_SEED=7
   SATSIM_STEPS=120
   SATSIM_SCHEDULER=heuristic            # priority_fair | heuristic
-  SATSIM_OPTIMIZER_BACKEND=solver       # heuristic | solver
+  SATSIM_OPTIMIZER_BACKEND=solver       # heuristic | solver | adaptive
   SATSIM_SOLVER_TIME_LIMIT_S=0.5
   SATSIM_VERBOSE=false
   ```

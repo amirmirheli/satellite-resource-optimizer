@@ -223,6 +223,24 @@ class OptimizerConfig(_Base):
         default=0.9, gt=0.0, le=1.0, description="Per-region utilization where congestion starts."
     )
 
+    # Adaptive (learning) admission curve — only used when backend is ADAPTIVE.
+    adaptive_buckets: int = Field(
+        default=8, gt=0, description="Score buckets in the learned admission curve."
+    )
+    adaptive_learning_rate: float = Field(
+        default=0.3, gt=0.0, le=1.0, description="Per-cadence step size of the online update."
+    )
+    adaptive_signal_smoothing: float = Field(
+        default=0.5, gt=0.0, le=1.0,
+        description="EWMA weight on each window's realized-utilization feedback.",
+    )
+    adaptive_floor_min: float = Field(
+        default=0.05, ge=0.0, le=1.0, description="Lower bound on any bucket's admit probability."
+    )
+    adaptive_collapse_penalty: float = Field(
+        default=1.0, ge=0.0, description="Downward pressure per unit of congestion-collapse risk."
+    )
+
 
 class EmergencyConfig(_Base):
     """Tier-2 reactive emergency-lane reservation + fairness caps."""

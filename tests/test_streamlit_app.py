@@ -18,13 +18,16 @@ def test_app_runs_with_defaults() -> None:
     app = AppTest.from_file("streamlit_app.py", default_timeout=30)
     app.run()
     assert not app.exception
+    # Before the Run button is clicked, no simulation has run yet: metrics are absent.
+    assert not app.metric
 
 
 def test_app_runs_a_scenario() -> None:
     app = AppTest.from_file("streamlit_app.py", default_timeout=30)
     app.run()
-    # Switch the base-scenario selectbox to a named scenario and re-run.
+    # Switch the base-scenario selectbox to a named scenario, then click Run.
     app.selectbox[0].select("emergency_surge").run()
+    app.button[0].click().run()
     assert not app.exception
-    # The metrics row renders (served metric present).
+    # The metrics row renders only after a run (served metric present).
     assert any("Served" in m.label for m in app.metric)
