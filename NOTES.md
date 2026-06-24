@@ -99,6 +99,15 @@ stay comparable, and the control loop is unchanged — selecting it is one confi
 behind one interface. A fuller MAC (explicit cell placement, SINR/interference, HARQ) would extend
 this same adapter; those remain non-goals for the control-plane focus.
 
+`ContentionMacScheduler` (`scheduler = contention_mac`) shares that RB grid but models the opposite
+**access discipline**: uncoordinated slotted random access (ALOHA) instead of central grants. Every
+UE picks RBs at random from a seeded RNG, and any RB chosen by more than `capture_capacity` UEs
+overloads — all packets touching it fail and defer (the loop's backoff handles retry). Throughput
+then traces the classic ALOHA curve (rises, peaks ~37%, collapses under load) that a granted
+scheduler hides by construction. `capture_capacity` models the spreading-code recovery of US
+11,848,747 (multiple UEs separable per RB, airtime split among them) — raising it trades per-user
+rate for fewer collisions, the random-access-vs-CDMA tradeoff made tunable.
+
 ## UI-readiness (e.g. Streamlit)
 
 The system is built to be driven programmatically by a future parameter-sweep UI: construct a
@@ -164,6 +173,16 @@ This per-region/per-class formulation measurably improves capacity use over the 
 Per-region budgets and fleet hints are still **advisory** to the Tier-1 scheduler today (the loop
 consults fairness weights + the admission curve); making them binding is the main next step.
 
+A third backend, `AdaptiveOptimizer` (`optimizer_backend = adaptive`), addresses a blind spot in the
+other two: both recompute the admission curve from *offered-load* utilization and keep no memory, so
+neither can see "shed traffic while beams sat idle." The adaptive backend holds a per-score-bucket
+admit probability as persistent state and nudges it from the **realized** outcome of the curve it
+last broadcast — raising low-score buckets when recent steps shed load while utilization stayed low,
+lowering them under congestion collapse, with the curve top pinned admit-all so high-value traffic
+is never shed and the EWMA-smoothed signal damping per-window noise. It's deliberately a small
+control law (not RL) so it stays deterministic and testable; it reuses the heuristic's
+fairness/budgets/hints and only replaces the admission curve.
+
 ## Fairness vs. efficiency (and why utilization is modest)
 
 The system deliberately favors **value over raw throughput**. Under heavy mixed load, admission
@@ -179,6 +198,14 @@ consequence is that average beam utilization is modest — that's a policy choic
 Degradation is the compromise that keeps degradable traffic *served* (partially) instead of
 dropped, so capacity isn't wasted while still honoring priority. Tuning the admission floor or the
 degrade fraction slides the system along the efficiency↔value axis.
+
+To keep "modest utilization is a choice, not waste" **falsifiable** rather than asserted, the
+experiment API decomposes idle capacity (`capacity_slack_summary`): demand pressure (offered ÷
+capacity, typically ≫1 — beams aren't idle for lack of work), the by-design/structural share of
+rejections (value-shed or no-legal-fleet, which idle beams elsewhere couldn't serve anyway), and
+*scarcity-drops-while-idle* — the only genuinely wasteful kind, and an upper bound at that (much is
+regional/spectrum mismatch). Serve-latency **percentiles** (p95/p99) sit alongside, because a
+priority system is judged by its tail, not its average. Both surface in the Streamlit UI.
 
 ## What I'd do next
 

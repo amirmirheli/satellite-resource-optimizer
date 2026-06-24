@@ -451,6 +451,8 @@ class ControlLoop:
 
         total_capacity = snapshot.total_capacity()
         utilization = allocated_units / total_capacity if total_capacity > 0.0 else 0.0
+        # End-to-end wait of each served request (arrival_step preserved across retries).
+        served_wait_steps = tuple(max(0, step - r.arrival_step) for r in served)
 
         return StepCounters(
             step=step,
@@ -464,10 +466,13 @@ class ControlLoop:
             served_by_region=served_by_region,
             served_by_fleet=served_by_fleet,
             rejected_by_reason=rejected_by_reason,
+            served_wait_steps=served_wait_steps,
             fairness_index=fairness_index,
             utilization=min(1.0, utilization),
             collapse_risk=congestion.collapse_risk,
             queue_depth=congestion.queue_depth,
+            offered_load_units=congestion.offered_load_units,
+            available_capacity_units=congestion.available_capacity_units,
             degrade_mode=degrade_mode,
             fallback_activations=fallback_activations,
             circuit_breaker_trips=circuit_breaker_trips,
@@ -519,7 +524,7 @@ def build_simulation(
         regulatory=regulatory,
         emergency=EmergencyLane(config.emergency, regulatory, config.scoring),
         admission=ProbabilisticAdmissionController(rng.derive("admission")),
-        scheduler=_build_scheduler(config),
+        scheduler=_build_scheduler(config, rng.derive("scheduler")),
         # Fallback chain: a plain heuristic scheduler is the simplest robust allocator.
         fallback_scheduler=HeuristicScheduler(config.scheduler_params.degrade_min_fraction),
         optimizer=build_optimizer(config),
@@ -530,15 +535,17 @@ def build_simulation(
     )
 
 
-def _build_scheduler(config: SimulationConfig) -> ResourceScheduler:
-    """Select the primary scheduler from ``config.scheduler``."""
-    from satsim.adapters.mac import SlotMacScheduler
+def _build_scheduler(config: SimulationConfig, rng: Rng) -> ResourceScheduler:
+    """Select the primary scheduler from ``config.scheduler`` (``rng`` seeds contention)."""
+    from satsim.adapters.mac import ContentionMacScheduler, SlotMacScheduler
     from satsim.adapters.scheduler import HeuristicScheduler, PriorityFairScheduler
 
     sched = config.scheduler_params
     degrade = sched.degrade_min_fraction
     if config.scheduler is SchedulerKind.SLOT_MAC:
         return SlotMacScheduler(config.mac)
+    if config.scheduler is SchedulerKind.CONTENTION_MAC:
+        return ContentionMacScheduler(config.mac, rng)
     if config.scheduler is SchedulerKind.PRIORITY_FAIR:
         return PriorityFairScheduler(sched.priority_fair_max_units_per_request, degrade)
     return HeuristicScheduler(degrade)

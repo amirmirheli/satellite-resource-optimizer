@@ -96,7 +96,7 @@ Each is a `typing.Protocol` with a license-free fake adapter (a real adapter cou
 | `RegulatoryPolicy` | `TableRegulatoryPolicy` | per-region spectrum legality + caps |
 | `AdmissionController` | `ProbabilisticAdmissionController` | Tier-1 load shedding |
 | `EmergencyAdmission` | `EmergencyLane` | Tier-2 reserved-capacity lane |
-| `ResourceScheduler` | `HeuristicScheduler` / `PriorityFairScheduler` / `SlotMacScheduler` | beam allocation + degradation (fluid or MAC RB-grid) |
+| `ResourceScheduler` | `HeuristicScheduler` / `PriorityFairScheduler` / `SlotMacScheduler` / `ContentionMacScheduler` | beam allocation + degradation (fluid, granted MAC RB-grid, or random-access MAC) |
 | `Optimizer` | `SolverOptimizer` / `HeuristicOptimizer` / `AdaptiveOptimizer` | Tier-3 global planning |
 | `TelemetrySink` | `ConsoleTelemetrySink` / `InMemoryTelemetrySink` | structured observability |
 
@@ -139,8 +139,8 @@ Each scenario is a runnable `SimulationConfig` (see [`scenarios.py`](src/satsim/
 
 ## Interactive UI (Streamlit)
 
-An optional Streamlit front-end lets you vary parameters and watch the results change — built as a
-thin shell over the UI-free [`experiment.py`](src/satsim/experiment.py) API:
+An optional Streamlit front-end lets you vary parameters and run the simulation interactively —
+built as a thin shell over the UI-free [`experiment.py`](src/satsim/experiment.py) API:
 
 ```bash
 uv sync --group ui                       # install the optional UI dependency
@@ -148,11 +148,22 @@ uv run --group ui streamlit run streamlit_app.py
 ```
 
 Sidebar widgets pick a base scenario and override seed, duration, scheduler, optimizer backend,
-load, link quality, emergency reservation, queue capacity, and an SOS surge; the page shows summary
-metrics plus per-step charts (dispositions, utilization/collapse-risk/fairness), served-by-class,
-and rejection reasons. The app imports nothing private — it builds a `SimulationConfig`, calls
-`run_experiment(config)`, and charts the returned summary + per-step series — so the same API
-drives parameter-sweep scripts or any other front-end.
+load, link quality, emergency reservation, queue capacity, and an SOS surge. Adjust as many as you
+like, then click **▶ Run simulation** — the (potentially expensive) run is gated behind the button
+rather than firing on every widget change, and a one-line summary of each run is logged to the
+terminal hosting `streamlit run`. The page then shows:
+
+- **Headline metrics** — served / dropped / rejected / backlog, utilization, peak collapse risk.
+- **"Is the idle capacity wasted?"** — demand pressure (offered ÷ capacity), the by-design /
+  structural share of rejections, and scarcity-drops-while-idle, plus a utilization-vs-demand
+  overlay — the evidence that modest utilization is a value/coverage outcome, not fumbled capacity.
+- **Serve latency** — p50 / p95 / p99 / max end-to-end wait (the tail the average hides).
+- **Per-step charts** — dispositions, system health (utilization/collapse-risk/fairness/queue
+  depth), served-by-class, and rejections by reason.
+
+The app imports nothing private — it builds a `SimulationConfig`, calls `run_experiment(config)`,
+and charts the returned summary + per-step series — so the same API drives parameter-sweep scripts
+or any other front-end.
 
 **Deploy it** — to Streamlit Community Cloud (free, hosted) or as a Docker image
 ([`Dockerfile.ui`](Dockerfile.ui) / [`docker-compose.yml`](docker-compose.yml)). Step-by-step
@@ -176,7 +187,7 @@ Two layers, by design:
   ```bash
   SATSIM_SEED=7
   SATSIM_STEPS=120
-  SATSIM_SCHEDULER=heuristic            # priority_fair | heuristic
+  SATSIM_SCHEDULER=heuristic            # heuristic | priority_fair | slot_mac | contention_mac
   SATSIM_OPTIMIZER_BACKEND=solver       # heuristic | solver | adaptive
   SATSIM_SOLVER_TIME_LIMIT_S=0.5
   SATSIM_VERBOSE=false

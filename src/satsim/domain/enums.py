@@ -95,6 +95,7 @@ class SchedulerKind(Enum):
     HEURISTIC = "heuristic"  # priority + weighted-fair
     PRIORITY_FAIR = "priority_fair"  # priority-aware constrained fairness
     SLOT_MAC = "slot_mac"  # MAC-style slot x subchannel grid with MCS link adaptation
+    CONTENTION_MAC = "contention_mac"  # slotted random access (ALOHA): contend, collisions defer
 
 
 class DegradeMode(Enum):
