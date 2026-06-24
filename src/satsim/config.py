@@ -178,6 +178,11 @@ class MacConfig(_Base):
     degrade_min_fraction: float = Field(
         default=0.25, gt=0.0, le=1.0, description="Min fraction of needed RBs worth serving."
     )
+    capture_capacity: int = Field(
+        default=1, ge=1,
+        description="ContentionMacScheduler: max UEs recoverable per RB via spreading codes "
+        "(1 = pure slotted ALOHA; >1 = CDMA-style capture, shared RB airtime split among them).",
+    )
     mcs_table: tuple[McsLevel, ...] = Field(default_factory=_default_mcs)
 
     @model_validator(mode="after")

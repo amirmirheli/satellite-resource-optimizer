@@ -6,13 +6,15 @@ probability. Implementations operate at different abstraction levels behind this
 
 * ``HeuristicScheduler`` / ``PriorityFairScheduler`` — fluid model: a beam is a scalar airtime
   capacity, an allocation is a number of airtime units (the default control-plane altitude).
-* ``SlotMacScheduler`` — MAC model: a beam is a slot x subchannel resource-block grid and
-  allocation is RB assignment with MCS-based link adaptation. It maps RBs back to airtime units
-  so the result is comparable.
+* ``SlotMacScheduler`` — granted MAC model: a beam is a slot x subchannel resource-block grid and
+  allocation is collision-free RB assignment with MCS-based link adaptation.
+* ``ContentionMacScheduler`` — random-access MAC model: UEs contend for RBs on the same grid
+  (slotted ALOHA), so collisions defer the colliders, with optional spreading-code capture.
 
-This is intentionally a resource-management abstraction, not a PHY/MAC simulator: there is no
-SINR/interference, no per-symbol modeling, and (outside ``SlotMacScheduler``) no slot/subchannel
-structure. ``Band`` is a legality tag, not an allocatable bandwidth.
+The MAC schedulers map RBs back to airtime units so results stay comparable. This is intentionally
+a resource-management abstraction, not a PHY/MAC simulator: there is no SINR/interference, no
+per-symbol modeling, and (in the fluid schedulers) no slot/subchannel structure. ``Band`` is a
+legality tag, not an allocatable bandwidth.
 """
 
 from __future__ import annotations

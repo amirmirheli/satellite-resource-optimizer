@@ -57,11 +57,18 @@ class StepCounters:
     served_by_region: Mapping[Region, int] = field(default_factory=dict)
     served_by_fleet: Mapping[FleetId, int] = field(default_factory=dict)
     rejected_by_reason: Mapping[RejectReason, int] = field(default_factory=dict)
+    # Wait (in steps, = served_step - arrival_step) of every request served this step. Per-request
+    # so a run can compute latency percentiles (p95/p99), not just an average.
+    served_wait_steps: tuple[int, ...] = ()
 
     fairness_index: float = 1.0  # Jain's index across candidate opportunity [0,1]
     utilization: float = 0.0  # fraction of capacity allocated [0,1]
     collapse_risk: float = 0.0  # congestion-collapse indicator [0,1]
     queue_depth: int = 0  # retry/source backlog visible to control and telemetry
+    # Offered best-effort load vs schedulable capacity this step (airtime units): lets a run tell
+    # demand-limited idle ("nobody asked") from wasted idle ("turned demand away with room").
+    offered_load_units: float = 0.0
+    available_capacity_units: float = 0.0
 
     degrade_mode: DegradeMode = DegradeMode.NORMAL
     fallback_activations: int = 0
