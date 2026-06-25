@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from satsim.adapters.scheduler import HeuristicScheduler, PriorityFairScheduler
+from satsim.adapters.scheduling import HeuristicScheduler, PriorityFairScheduler
 from satsim.domain.enums import Band, FleetId, Region, RejectReason, TrafficClass
 from satsim.domain.models import (
     Beam,

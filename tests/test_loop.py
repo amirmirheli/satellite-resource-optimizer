@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from satsim.adapters.telemetry import InMemoryTelemetrySink
+from satsim.adapters.io import InMemoryTelemetrySink
 from satsim.config import (
     ArrivalConfig,
     EmergencyConfig,
@@ -12,7 +12,7 @@ from satsim.config import (
 )
 from satsim.domain.enums import FleetId, RejectReason, TrafficClass
 from satsim.domain.models import Allocation, ConstellationSnapshot
-from satsim.loop import build_simulation, merge_snapshots, subtract_reservations
+from satsim.runtime.loop import build_simulation, merge_snapshots, subtract_reservations
 
 
 def _run(config: SimulationConfig) -> tuple[InMemoryTelemetrySink, object]:

@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-satsim = "satsim.cli:main"
+satsim = "satsim.runtime.cli:main"
 
 [dependency-groups]
 dev = [

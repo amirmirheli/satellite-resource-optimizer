@@ -8,8 +8,8 @@ import sys
 import pytest
 from pydantic import ValidationError
 
-from satsim.cli import SCENARIOS, main
 from satsim.rng import Rng
+from satsim.runtime.cli import SCENARIOS, main
 from satsim.scenarios import build_scenario
 
 

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from satsim.adapters.io import InMemoryTelemetrySink
 from satsim.adapters.mac import ContentionMacScheduler
-from satsim.adapters.telemetry import InMemoryTelemetrySink
 from satsim.config import MacConfig, SimulationConfig
 from satsim.domain.enums import Band, FleetId, Region, RejectReason, SchedulerKind, TrafficClass
 from satsim.domain.models import (
@@ -15,9 +15,9 @@ from satsim.domain.models import (
     ScheduleCandidate,
     ServiceRequest,
 )
-from satsim.loop import build_simulation
 from satsim.ports.scheduler import ResourceScheduler
 from satsim.rng import Rng
+from satsim.runtime.loop import build_simulation
 
 _FLEET = FleetId.NEXT_GEN
 _BAND = Band.KU

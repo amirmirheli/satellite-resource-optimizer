@@ -507,13 +507,11 @@ def build_simulation(
 ) -> ControlLoop:
     """Composition root: wire the default fakes/adapters into a runnable control loop."""
     # Local imports keep the core module import-light and avoid any import cycles.
-    from satsim.adapters.admission import ProbabilisticAdmissionController
-    from satsim.adapters.constellation import build_fake_constellations
-    from satsim.adapters.emergency import EmergencyLane
-    from satsim.adapters.optimizer import build_optimizer
-    from satsim.adapters.regulatory import TableRegulatoryPolicy
-    from satsim.adapters.request_source import SyntheticRequestSource
-    from satsim.adapters.scheduler import HeuristicScheduler
+    from satsim.adapters.admission import EmergencyLane, ProbabilisticAdmissionController
+    from satsim.adapters.io import SyntheticRequestSource
+    from satsim.adapters.network import TableRegulatoryPolicy, build_fake_constellations
+    from satsim.adapters.optimization import build_optimizer
+    from satsim.adapters.scheduling import HeuristicScheduler
 
     rng = Rng(config.seed)
     regulatory = TableRegulatoryPolicy(config)
@@ -538,7 +536,7 @@ def build_simulation(
 def _build_scheduler(config: SimulationConfig, rng: Rng) -> ResourceScheduler:
     """Select the primary scheduler from ``config.scheduler`` (``rng`` seeds contention)."""
     from satsim.adapters.mac import ContentionMacScheduler, SlotMacScheduler
-    from satsim.adapters.scheduler import HeuristicScheduler, PriorityFairScheduler
+    from satsim.adapters.scheduling import HeuristicScheduler, PriorityFairScheduler
 
     sched = config.scheduler_params
     degrade = sched.degrade_min_fraction

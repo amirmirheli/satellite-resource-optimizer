@@ -4,22 +4,19 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from satsim.adapters.admission import ProbabilisticAdmissionController
-from satsim.adapters.constellation import build_fake_constellations
-from satsim.adapters.emergency import EmergencyLane
-from satsim.adapters.optimizer import build_optimizer
-from satsim.adapters.regulatory import TableRegulatoryPolicy
-from satsim.adapters.request_source import SyntheticRequestSource
-from satsim.adapters.scheduler import HeuristicScheduler
-from satsim.adapters.telemetry import InMemoryTelemetrySink
+from satsim.adapters.admission import EmergencyLane, ProbabilisticAdmissionController
+from satsim.adapters.io import InMemoryTelemetrySink, SyntheticRequestSource
+from satsim.adapters.network import TableRegulatoryPolicy, build_fake_constellations
+from satsim.adapters.optimization import build_optimizer
+from satsim.adapters.scheduling import HeuristicScheduler
 from satsim.config import OverloadConfig, SimulationConfig
 from satsim.domain.enums import DegradeMode, FleetId
 from satsim.domain.models import ConstellationSnapshot, ScheduleCandidate, SchedulingResult
-from satsim.loop import ControlLoop
 from satsim.ports.constellation import ConstellationClient, ConstellationError
 from satsim.ports.scheduler import ResourceScheduler
 from satsim.resilience import CircuitBreaker
 from satsim.rng import Rng
+from satsim.runtime.loop import ControlLoop
 from satsim.scoring import RequestScorer
 
 # --------------------------------------------------------------------------- circuit breaker

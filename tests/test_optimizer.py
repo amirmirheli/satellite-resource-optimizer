@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from satsim.adapters.optimizer import (
+from satsim.adapters.optimization import (
     AdaptiveOptimizer,
     HeuristicOptimizer,
     SolverOptimizer,

@@ -11,11 +11,11 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from satsim.adapters.telemetry import InMemoryTelemetrySink
+from satsim.adapters.io import InMemoryTelemetrySink
 from satsim.config import SimulationConfig
 from satsim.domain.enums import RejectReason
 from satsim.domain.telemetry import StepCounters
-from satsim.loop import RunSummary, build_simulation
+from satsim.runtime.loop import RunSummary, build_simulation
 
 # Utilization below which a step is judged to have had spare capacity (for the waste signal).
 _SPARE_UTILIZATION = 0.9
