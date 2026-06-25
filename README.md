@@ -126,7 +126,7 @@ uv run pytest -m solver          # solver tests (OR-Tools)
 
 ## Scenarios
 
-Each scenario is a runnable `SimulationConfig` (see [`scenarios.py`](src/satsim/scenarios.py)):
+Each scenario is a runnable `SimulationConfig` (see [`scenarios/`](src/satsim/scenarios/catalog.py)):
 
 | Scenario | Demonstrates |
 |---|---|
@@ -140,7 +140,7 @@ Each scenario is a runnable `SimulationConfig` (see [`scenarios.py`](src/satsim/
 ## Interactive UI (Streamlit)
 
 An optional Streamlit front-end lets you vary parameters and run the simulation interactively —
-built as a thin shell over the UI-free [`experiment.py`](src/satsim/experiment.py) API:
+built as a thin shell over the UI-free [`experiment.py`](src/satsim/runtime/experiment.py) API:
 
 ```bash
 uv sync --group ui                       # install the optional UI dependency
@@ -203,19 +203,25 @@ Two layers, by design:
 src/satsim/
   domain/        pure dataclasses + enums (no I/O) — the vocabulary across ports
   ports/         interfaces only (typing.Protocol) — the dependency boundary
-  adapters/      license-free fakes: constellation, regulatory, admission, emergency,
-                 scheduler (fluid), mac (RB-grid), optimizer, request_source, telemetry
+  adapters/      license-free fakes, grouped by capability:
+    scheduling/    fluid schedulers (HeuristicScheduler, PriorityFairScheduler)
+    mac/           RB-grid schedulers (SlotMacScheduler, ContentionMacScheduler)
+    optimization/  Tier-3 planners (Heuristic / Solver / Adaptive, build_optimizer)
+    admission/     Tier-1 ProbabilisticAdmissionController + Tier-2 EmergencyLane
+    network/       FakeConstellation + TableRegulatoryPolicy (the environment)
+    io/            SyntheticRequestSource + telemetry sinks
+  runtime/       services that compose the layers:
+    loop.py        ControlLoop (Tier 1) + build_simulation composition root
+    experiment.py  UI-free run + chart-data API (drives the Streamlit app)
+    cli.py         scenario runner entry point
+  scenarios/     named scenarios → SimulationConfig (catalog.py)
   config.py      typed, validated simulation config (pydantic)
   settings.py    run-level env/.env settings (pydantic-settings)
-  scenarios.py   named scenarios → SimulationConfig
-  experiment.py  UI-free run + chart-data API (drives the Streamlit app)
   scoring.py     RequestScorer — one source of truth for score/cost/delivery-prob
   demand.py      DemandGenerator (Poisson baseline + scheduled surges)
   bus.py         InMemoryBus (fake Kafka-style topic)
   resilience.py  CircuitBreaker
-  loop.py        ControlLoop (Tier 1) + build_simulation composition root
   rng.py         seedable RNG (determinism)
-  cli.py         scenario runner entry point
 streamlit_app.py interactive UI (optional `ui` dependency group)
 tests/           unit + integration + scenario tests (all on fakes, sub-second)
 ```

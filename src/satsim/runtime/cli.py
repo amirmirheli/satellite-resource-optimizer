@@ -8,9 +8,9 @@ from collections.abc import Sequence
 from pydantic import ValidationError
 
 from satsim import __version__
-from satsim.adapters.telemetry import ConsoleTelemetrySink, InMemoryTelemetrySink
+from satsim.adapters.io import ConsoleTelemetrySink, InMemoryTelemetrySink
 from satsim.config import OptimizerConfig, SimulationConfig
-from satsim.loop import RunSummary, build_simulation
+from satsim.runtime.loop import RunSummary, build_simulation
 from satsim.scenarios import SCENARIOS, build_scenario, scenario_names
 from satsim.settings import RunSettings
 

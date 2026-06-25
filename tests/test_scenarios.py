@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from satsim.adapters.telemetry import InMemoryTelemetrySink
+from satsim.adapters.io import InMemoryTelemetrySink
 from satsim.domain.enums import RejectReason, TrafficClass
-from satsim.loop import RunSummary, build_simulation
+from satsim.runtime.loop import RunSummary, build_simulation
 from satsim.scenarios import build_scenario, scenario_names
 
 

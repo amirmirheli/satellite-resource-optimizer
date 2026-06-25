@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from satsim.adapters.constellation import FakeConstellation, build_fake_constellations
-from satsim.adapters.regulatory import TableRegulatoryPolicy
-from satsim.adapters.request_source import SyntheticRequestSource
-from satsim.adapters.telemetry import ConsoleTelemetrySink, InMemoryTelemetrySink
+from satsim.adapters.io import ConsoleTelemetrySink, InMemoryTelemetrySink, SyntheticRequestSource
+from satsim.adapters.network import (
+    FakeConstellation,
+    TableRegulatoryPolicy,
+    build_fake_constellations,
+)
 from satsim.bus import InMemoryBus
 from satsim.config import SimulationConfig
 from satsim.domain.enums import Band, FleetId, Outcome, Region, TrafficClass

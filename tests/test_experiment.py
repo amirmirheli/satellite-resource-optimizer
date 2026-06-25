@@ -5,7 +5,7 @@ from __future__ import annotations
 from satsim.config import SimulationConfig
 from satsim.domain.enums import RejectReason
 from satsim.domain.telemetry import StepCounters
-from satsim.experiment import (
+from satsim.runtime.experiment import (
     ExperimentResult,
     capacity_slack_summary,
     disposition_series,

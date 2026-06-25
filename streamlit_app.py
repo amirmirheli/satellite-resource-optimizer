@@ -2,7 +2,7 @@
 
 Run with:  uv run --group ui streamlit run streamlit_app.py
 
-A thin UI over :mod:`satsim.experiment`: pick a scenario, tweak parameters in the sidebar, run,
+A thin UI over :mod:`satsim.runtime.experiment`: pick a scenario, tweak parameters in the sidebar,
 and chart the results. All the real logic lives in the (UI-free, tested) library.
 """
 
@@ -16,7 +16,7 @@ import streamlit as st
 from satsim.config import SimulationConfig, SurgeEvent
 from satsim.domain.enums import OptimizerBackend, SchedulerKind, TrafficClass
 from satsim.domain.telemetry import StepCounters
-from satsim.experiment import (
+from satsim.runtime.experiment import (
     ExperimentResult,
     capacity_slack_summary,
     disposition_series,

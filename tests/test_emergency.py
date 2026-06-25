@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from satsim.adapters.emergency import EmergencyLane
+from satsim.adapters.admission import EmergencyLane
 from satsim.config import EmergencyConfig
 from satsim.domain.enums import Band, FleetId, Region, RejectReason, TrafficClass
 from satsim.domain.models import (

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from satsim.cli import _apply_run_overrides, main
 from satsim.config import SimulationConfig
 from satsim.domain.enums import OptimizerBackend, SchedulerKind
+from satsim.runtime.cli import _apply_run_overrides, main
 from satsim.scenarios import build_scenario
 from satsim.settings import RunSettings
 
